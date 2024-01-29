@@ -25,15 +25,12 @@
     "electron-updater": "6.1.4",
     "express": "4.18.2",
     "express-ws": "5.0.2",
-    "jsfit": "github:saucellc/jsfit.git#617a6e1087",
+    "jsfit": "github:DevSakkaravarthi/jsfit.git",
     "keytar": "7.9.0",
     "lossless-json": "4.0.1",
     "node-fetch": "3.3.2",
     "protobufjs": "7.2.5",
     "xxhash-addon": "2.0.1"
-  },
-  "optionalDependencies": {
-    "zwift-utils": "https://github.com/SauceLLC/zwift-utils.git#19fa2c9284f087f397f80b870a50771a398e2c8c"
   },
   "devDependencies": {
     "@electron/notarize": "2.1.0",
@@ -135,7 +132,6 @@
       },
       "notarize": false,
       "category": "public.app-category.healthcare-fitness",
-      "identity": "Sauce, LLC (7P47F44SKP)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
