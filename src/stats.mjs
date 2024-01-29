@@ -325,6 +325,7 @@ export class StatsProcessor extends events.EventEmitter {
         rpc.register(this.startLap, {scope: this});
         rpc.register(this.resetStats, {scope: this});
         rpc.register(this.exportFIT, {scope: this});
+        rpc.register(this.exportCSV, {scope: this});
         rpc.register(this.getAthlete, {scope: this});
         rpc.register(this.getFollowingAthletes, {scope: this});
         rpc.register(this.getFollowerAthletes, {scope: this});
@@ -799,7 +800,41 @@ export class StatsProcessor extends events.EventEmitter {
             this._resetAthleteData(ad, wt);
         }
     }
-
+    async exportCSV(id) {
+        const athleteId = this._realAthleteId(id);
+        console.debug("Exporting CSV file for:", athleteId);
+        if (athleteId == null) {
+            throw new TypeError('athleteId required');
+        }
+        if (!this._athleteData.has(athleteId)) {
+            throw new TypeError('no data for athlete');
+        }
+        const athlete = this.loadAthlete(athleteId);
+        const {laps, streams, wtOffset} = this._athleteData.get(athleteId);
+        const tsOffset = worldTimer.toServerTime(wtOffset);
+        const playerState = await this.getPlayerState(athleteId);
+        let csvContent = "Timestamp, Speed, Heart Rate, Cadence, Power, Distance, Altitude, Position Lat, Position Long, Draft\n";
+        for (const {power, speed, cadence, hr} of laps) {
+            if ([speed, cadence, hr].some(x => x.roll.size() !== power.roll.size())) {
+                throw new Error("Assertion failure about roll sizes being equal");
+            }
+            for (let i = 0; i < power.roll.size(); i++) {
+                const timestamp = tsOffset + (power.roll.timeAt(i) * 1000);
+                const speedValue = speed.roll.valueAt(i) * 1000 / 3600; // Convert from mm/s to m/s
+                const heartRate = +hr.roll.valueAt(i);
+                const cadenceValue = Math.round(cadence.roll.valueAt(i));
+                const powerValue = Math.round(power.roll.valueAt(i));
+                const distance = streams.distance[i];
+                const altitude = streams.altitude[i];
+                const [positionLat, positionLong] = streams.latlng[i];
+                const draft = playerState.draft;
+                const row = `${timestamp}, ${speedValue}, ${heartRate}, ${cadenceValue}, ${powerValue}, ${distance}, ${altitude}, ${positionLat}, ${positionLong}, ${draft}\n`;
+                csvContent += row;
+            }
+        }
+        return csvContent;
+    }
+    
     async exportFIT(id) {
         const athleteId = this._realAthleteId(id);
         console.debug("Exporting FIT file for:", athleteId);
@@ -850,6 +885,7 @@ export class StatsProcessor extends events.EventEmitter {
         let lapNumber = 0;
         let lastTS;
         let offt = 0;
+        const playerState = await this.getPlayerState(athleteId);
         for (const {power, speed, cadence, hr} of laps) {
             if ([speed, cadence, hr].some(x => x.roll.size() !== power.roll.size())) {
                 throw new Error("Assertion failure about roll sizes being equal");
@@ -857,13 +893,16 @@ export class StatsProcessor extends events.EventEmitter {
             for (let i = 0; i < power.roll.size(); i++, offt++) {
                 lastTS = tsOffset + (power.roll.timeAt(i) * 1000);
                 const record = {timestamp: lastTS};
-                record.speed = speed.roll.valueAt(i) * 1000 / 3600;
+                record.speed12 = speed.roll.valueAt(i) * 1000 / 3600;
                 record.heart_rate = +hr.roll.valueAt(i);
                 record.cadence = Math.round(cadence.roll.valueAt(i));
                 record.power = Math.round(power.roll.valueAt(i));
                 record.distance = streams.distance[offt];
                 record.altitude = streams.altitude[offt];
                 [record.position_lat, record.position_long] = streams.latlng[offt];
+                // Add data from playerState
+                record.draft = Math.round(playerState.draft);
+                // Other fields from playerState can be added similarly
                 fitParser.addMessage('record', record);
             }
             const elapsed = power.roll.lastTime() - power.roll.firstTime();
