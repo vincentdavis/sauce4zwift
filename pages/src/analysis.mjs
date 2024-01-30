@@ -167,6 +167,23 @@ async function exportFITActivity(name) {
     }
 }
 
+async function exportCSVActivity(name) {
+    const csvData = await common.rpc.exportCSV(athleteIdent);
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `${name}.csv`;
+
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+}
+
 
 function createElevationLineChart(el) {
     const series = [{
@@ -643,6 +660,17 @@ export async function main() {
         const name = `${athlete ? athlete.fLast : athleteIdent} - ${started.toLocaleString()}`;
         exportFITActivity(name);
     });
+
+    const exportBtnCSV = document.querySelector('.button.export-file-csv');
+    exportBtnCSV.removeAttribute('disabled');
+    exportBtnCSV.addEventListener('click', () => {
+        // XXX nope.  athletedata becomses stale over time...
+        const started = new Date(Date.now() - athleteData.stats.elapsedTime * 1000);
+        const athlete = athleteData.athlete;
+        const name = `${athlete ? athlete.fLast : athleteIdent} - ${started.toLocaleString()}`;
+        exportCSVActivity(name);
+    });
+    
     elevationChart = createElevationLineChart(contentEl.querySelector('.chart-holder.elevation .chart'));
     zoomableChart = createZoomableLineChart(contentEl.querySelector('.chart-holder.zoomable .chart'));
     powerZonesChart = createTimeInPowerZonesPie(contentEl.querySelector('.time-in-power-zones'));
